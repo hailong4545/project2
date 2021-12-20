@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        html {
+            background-color: rgb(98, 98, 143);
+        }
+
+        .container {
+            margin: 0 auto;
+            margin-top: 50px;
+            width: 1000px;
+            height: 500px; 
+            /* background-color: rgb(85, 62, 170); */
+            display: grid;
+            grid-template-columns: auto auto;
+            /* gap: 40px; */
+        }
+
+        .container>div {
+            text-align: center;
+            border: 1px solid black;
+            padding: 30px;
+        }
+
+        .container>div:hover {
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        .clock {
+            width: 50px;
+            height: 30px;
+            font-size: 20px;
+            font-weight: bold;
+            border: 1px solid black;
+            text-align: center;
+            float: right;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class='wait-screen'>
+        <h3></h3>
+        <div class='player' style="margin: 0 auto; width: 800px; height: 400px; border: 1px solid black">
+            
+        </div>
+    </div>
+    <div class='game' style='display: none'>
+        <div class='clock'></div>
+        <div class='container'>
+            <div style="grid-column-start: 1;
+            grid-column-end: 3; font-weight: 600; font-size: 27px;"></div>
+            <div id='A'></div>
+            <div id='B'></div>
+            <div id='C'></div>
+            <div id='D'></div>
+        </div>
+    </div>
+    <script src="http://localhost:3003/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io.connect('http://localhost:3003');
+        const room = window.location.href.split('&')[1].split('=')[1];
+
+        var name = '';
+        var cookie = document.cookie.split(';');
+        for(let i = 0; i< cookie.length; i++) {
+            cookie[i] = cookie[i].split('=');
+            if (cookie[i][0] == 'token') {
+                name = cookie[i][1];
+            }
+        }
+
+        const A = document.querySelector('#A');
+        const B = document.querySelector('#B');
+        const C = document.querySelector('#C');
+        const D = document.querySelector('#D');
+        const question = document.querySelector('#question');
+
+        socket.emit('new person', (room, name));
+
+        socket.on('new person', (room) => {
+            let tagName = document.createElement('span');
+            tagName.innerText = person;
+            player.appendChild(tagName);
+        })
+
+        function set(project, index) {
+            question.innerText = project['questions'][index];
+            A.innerText = project['answers'][index][0];
+            B.innerText = project['answers'][index][1];
+            C.innerText = project['answers'][index][2];
+            D.innerText = project['answers'][index][3];
+            set_clock(parseInt(project['setTime'][index]));
+        }
+
+        const clock = document.querySelector('.clock');
+        
+        function set_clock(time) {
+            if (time+1) {
+                setTimeout(set_clock, 1000, time-1);
+                // time--;
+                clock.innerHTML = String(time) + 's';
+            }
+            else {
+                setTimeout(socket.emit, 5000, 'next question', room);
+            }
+        }
+
+        const player = document.querySelector('.player');
+
+        socket.on('start game', (project) => {
+            set(project, 0);
+        })
+
+    </script>
+</body>
+</html>

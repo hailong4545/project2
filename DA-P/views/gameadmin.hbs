@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        html {
+            background-color: rgb(98, 98, 143);
+        }
+
+        .container {
+            margin: 0 auto;
+            margin-top: 50px;
+            width: 1000px;
+            height: 500px; 
+            /* background-color: rgb(85, 62, 170); */
+            display: grid;
+            grid-template-columns: auto auto;
+            /* gap: 40px; */
+        }
+
+        .container>div {
+            text-align: center;
+            border: 1px solid black;
+            padding: 30px;
+        }
+
+        .container>div:hover {
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        .clock {
+            width: 50px;
+            height: 30px;
+            font-size: 20px;
+            font-weight: bold;
+            border: 1px solid black;
+            text-align: center;
+            float: right;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class='wait-screen'>
+        <button id='btn-start' style='float: right; width: 100px; height: 30px; font-size: 20px'>Start</button>
+        <h3 style="text-align: center;"></h3>
+        <div class='player' style="margin: 0 auto; width: 800px; height: 400px; border: 1px solid black; margin-top: 200px">
+            
+        </div>
+    </div>
+    <div class='game' style='display: none'>
+        <div class='clock'></div>
+        <div class='container'>
+            <div id='question' style="grid-column-start: 1;
+            grid-column-end: 3; font-weight: 600; font-size: 27px;"></div>
+            <div class='option' id='A'></div>
+            <div class='option' id='B'></div>
+            <div class='option' id='C'></div>
+            <div class='option' id='D'></div>
+        </div>
+    </div>
+    <div class='rank'>
+        <button style="float: right; display: none" id='btn-next'>Next</button>
+        <div class='content-rank'></div>
+    </div>
+    <script src="http://localhost:3003/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io.connect('http://localhost:3003');
+        const room = window.location.href.split('&')[1].split('=')[1];
+
+        const clock = document.querySelector('.clock');
+        const btnNext = document.querySelector('#btn-next');
+        const rank = document.querySelector('.rank');
+        const contentRank = document.querySelector('.content-rank');
+
+        var name = '';
+        var cookie = document.cookie.split(';');
+        for(let i = 0; i< cookie.length; i++) {
+            cookie[i] = cookie[i].split('=');
+            if (cookie[i][0] == 'token') {
+                name = cookie[i][1];
+            }
+        }
+
+        const A = document.querySelector('#A');
+        const B = document.querySelector('#B');
+        const C = document.querySelector('#C');
+        const D = document.querySelector('#D');
+        const question = document.querySelector('#question');
+
+        const game = document.querySelector('.game');
+
+        const btnStart = document.querySelector('#btn-start');
+
+        btnStart.addEventListener('click', (e) => {
+            socket.emit('start game', room);
+        })
+
+        var check = '';
+        var ans = '';
+
+        const options = document.querySelectorAll('.option');
+        for(let i = 0; i < options.length; i++) {
+            options[i].addEventListener('click', (e) => {
+                if (!ans) {
+                    ans = options[i].id;
+                    socket.emit('send answer', [name, room, ans, clock.innerText])
+                    options[i].style.backGround = 'red';
+                }
+            })
+        }
+
+        async function getProjects() {
+            let data = await fetch('http://localhost:3000/api/projects');
+            let projects = await data.json();
+            let project = await projects.find(p => p.id == room);
+            if (project.admin == name) {
+                socket.emit('get project', project);
+                btnNext.style.display = 'block';
+                check = 1;
+            }
+            else {
+                socket.emit('new person', ([room, name]));
+                btnStart.style.display = 'none';
+            }
+            document.querySelector('h3').innerText = project.content;
+            return project;
+        }
+        
+        
+        getProjects();
+
+
+        socket.on('new person', (players) => {
+            player.innerHTML = '';
+            for(let i = 0; i < players.length; i++) {
+                let tagName = document.createElement('span');
+                tagName.innerText = players[i];
+                player.appendChild(tagName);
+            }
+        })
+
+        function set(project, index) {
+            ans = '';
+            game.style.display = 'block';
+            rank.style.display = 'none';
+            contentRank.innerHTML = '';
+            
+            for(let i = 0; i < options.length; i++) {
+                options[i].style.backGround = '';
+            }
+
+            question.innerText = project['questions'][index];
+            A.innerText = project['answers'][index][0];
+            B.innerText = project['answers'][index][1];
+            C.innerText = project['answers'][index][2];
+            D.innerText = project['answers'][index][3];
+            
+            set_clock(parseInt(project['setTime'][index]));
+        }
+
+        function request_rank() {
+            socket.emit('rank', room);
+        }
+
+        
+        function set_clock(time) {
+            if (time+1) {
+                setTimeout(set_clock, 1000, time-1);
+                // time--;
+                clock.innerHTML = String(time) + 's';
+
+            }
+            else {
+                if (check) {
+                    setTimeout(request_rank, 1000);
+                }
+            }
+        }
+
+        
+
+        const player = document.querySelector('.player');
+    
+        socket.on('start game', (project) => {
+            console.log(project);
+            game.style.display = 'block';
+            document.querySelector('.wait-screen').style.display = 'none';
+            set(project, 0);
+        })
+
+        socket.on('next question', (project) => {
+            set(project, parseInt(project.index));
+        })
+
+        socket.on('rank', (points) => {
+            console.log(points);
+            rank.style.display = 'block';
+            game.style.display = 'none';
+            let ps_points = [];
+            let keys = Object.keys(points);
+            console.log(keys);
+            for(let i = 0; i < keys.length; i++) {
+                ps_points.push({'player': keys[i], 'point': points[keys[i]]});
+            }
+
+            ps_points.sort((a, b) => b.point - a.point);
+            console.log(ps_points);
+            for(let i = 0; i < ps_points.length; i++) {
+                let tagRank = document.createElement('p');
+                tagRank.innerText = `${ps_points[i].player} : ${ps_points[i].point}`;
+                contentRank.appendChild(tagRank);
+            }
+
+        })
+
+        btnNext.addEventListener('click', (e) => {
+            socket.emit('next question', room);
+        })
+    </script>
+</body>
+</html>
